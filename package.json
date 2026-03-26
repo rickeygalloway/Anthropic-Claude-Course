@@ -13,7 +13,7 @@
     "db:reset": "npx prisma migrate reset --force"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "1.2.12",
+    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/react": "^3.0.110",
     "@babel/standalone": "^7.27.6",
     "@monaco-editor/react": "^4.7.0",

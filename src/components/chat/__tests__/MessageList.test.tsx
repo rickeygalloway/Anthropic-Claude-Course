@@ -1,7 +1,8 @@
 import { test, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MessageList } from "../MessageList";
-import type { Message } from "ai";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Message = any;
 
 // Mock the MarkdownRenderer component
 vi.mock("../MarkdownRenderer", () => ({

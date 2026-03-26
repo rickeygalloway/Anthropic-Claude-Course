@@ -5,19 +5,22 @@ import {
   useContext,
   ReactNode,
   useEffect,
+  useState,
+  useCallback,
+  useMemo,
 } from "react";
 import { useChat as useAIChat } from "@ai-sdk/react";
-import { Message } from "ai";
+import { DefaultChatTransport } from "ai";
 import { useFileSystem } from "./file-system-context";
 import { setHasAnonWork } from "@/lib/anon-work-tracker";
 
 interface ChatContextProps {
   projectId?: string;
-  initialMessages?: Message[];
+  initialMessages?: any[];
 }
 
 interface ChatContextType {
-  messages: Message[];
+  messages: any[];
   input: string;
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
@@ -32,26 +35,60 @@ export function ChatProvider({
   initialMessages = [],
 }: ChatContextProps & { children: ReactNode }) {
   const { fileSystem, handleToolCall } = useFileSystem();
+  const [input, setInput] = useState("");
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    status,
-  } = useAIChat({
-    api: "/api/chat",
-    initialMessages,
-    body: {
-      files: fileSystem.serialize(),
-      projectId,
-    },
+  // fileSystem is a stable reference (created once via useState), so this
+  // transport is created once. The body function always reads current FS state.
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: () => ({
+          files: fileSystem.serialize(),
+          projectId,
+        }),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const { messages, sendMessage, status, error } = useAIChat({
+    transport,
+    messages: initialMessages,
     onToolCall: ({ toolCall }) => {
-      handleToolCall(toolCall);
+      // AI SDK v6: args are now called "input"
+      handleToolCall({
+        toolName: (toolCall as any).toolName,
+        args: (toolCall as any).input,
+      });
+    },
+    onError: (err) => {
+      console.error("[ChatProvider] API error:", err);
     },
   });
 
-  // Track anonymous work
+  // Log errors for debugging
+  useEffect(() => {
+    if (error) console.error("[ChatProvider] error state:", error);
+  }, [error]);
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setInput(e.target.value);
+    },
+    []
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (!input.trim()) return;
+      sendMessage({ text: input });
+      setInput("");
+    },
+    [input, sendMessage]
+  );
+
   useEffect(() => {
     if (!projectId && messages.length > 0) {
       setHasAnonWork(messages, fileSystem.serialize());
